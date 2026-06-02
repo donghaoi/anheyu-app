@@ -18,7 +18,7 @@ jobs:
         env:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ISSUE_TRIAGE_MODEL: ${{ vars.ISSUE_TRIAGE_MODEL || 'gpt-4o-mini' }}
+          ISSUE_TRIAGE_MODEL: ${{ secrets.ISSUE_TRIAGE_MODEL || vars.ISSUE_TRIAGE_MODEL || 'gpt-4o-mini' }}
         with:
           script: |
             const marker = "<!-- anheyu-ai-issue-triage -->";
