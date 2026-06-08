@@ -227,7 +227,7 @@ func (s *serviceImpl) ExportArticlesToZip(ctx context.Context, articleIDs []stri
 
 ## 导入说明
 
-使用本系统的导入功能，选择 articles.json 文件即可导入所有文章。
+使用本系统的文章导入功能，可直接上传当前 ZIP 文件；也可以解压后单独选择 articles.json 导入所有文章。
 `,
 			exportData.ExportAt.Format("2006-01-02 15:04:05"),
 			exportData.Version,
