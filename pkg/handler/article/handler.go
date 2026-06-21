@@ -1,6 +1,7 @@
 package article
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,10 @@ import (
 // Handler 封装了所有与文章相关的 HTTP 处理器。
 type Handler struct {
 	svc articleSvc.Service
+}
+
+type uploadArticleImageWithOptions interface {
+	UploadArticleImageWithGroupOptions(ctx context.Context, ownerID, userGroupID uint, fileReader io.Reader, originalFilename string, options articleSvc.UploadArticleImageOptions) (fileURL string, publicFileID string, err error)
 }
 
 // NewHandler 是 Handler 的构造函数。
@@ -96,9 +101,29 @@ func (h *Handler) UploadImage(c *gin.Context) {
 		}
 	}
 
+	skipImageStyle := c.DefaultPostForm("skip_image_style", "false") == "true"
+
 	// 4. 调用Service层处理业务逻辑
 	log.Printf("[Handler.UploadImage] 开始调用Service层处理图片上传")
-	directLinkURL, publicFileID, err := h.svc.UploadArticleImageWithGroup(c.Request.Context(), ownerID, userGroupID, fileReader, fileHeader.Filename)
+	var directLinkURL, publicFileID string
+	if optionsSvc, ok := h.svc.(uploadArticleImageWithOptions); ok {
+		directLinkURL, publicFileID, err = optionsSvc.UploadArticleImageWithGroupOptions(
+			c.Request.Context(),
+			ownerID,
+			userGroupID,
+			fileReader,
+			fileHeader.Filename,
+			articleSvc.UploadArticleImageOptions{SkipImageStyle: skipImageStyle},
+		)
+	} else {
+		directLinkURL, publicFileID, err = h.svc.UploadArticleImageWithGroup(
+			c.Request.Context(),
+			ownerID,
+			userGroupID,
+			fileReader,
+			fileHeader.Filename,
+		)
+	}
 	if err != nil {
 		log.Printf("[Handler.UploadImage] Service处理失败: %v", err)
 		response.Fail(c, http.StatusInternalServerError, "图片上传失败")

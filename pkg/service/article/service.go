@@ -103,6 +103,11 @@ type Service interface {
 	GetArticleStatistics(ctx context.Context) (*model.ArticleStatistics, error)
 }
 
+// UploadArticleImageOptions 控制文章图片上传响应 URL 的可选行为。
+type UploadArticleImageOptions struct {
+	SkipImageStyle bool
+}
+
 type serviceImpl struct {
 	repo             repository.ArticleRepository
 	postTagRepo      repository.PostTagRepository
@@ -274,6 +279,11 @@ func (s *serviceImpl) UploadArticleImage(ctx context.Context, ownerID uint, file
 
 // UploadArticleImageWithGroup 处理文章图片的上传，并检查用户组权限。
 func (s *serviceImpl) UploadArticleImageWithGroup(ctx context.Context, ownerID, userGroupID uint, fileReader io.Reader, originalFilename string) (string, string, error) {
+	return s.UploadArticleImageWithGroupOptions(ctx, ownerID, userGroupID, fileReader, originalFilename, UploadArticleImageOptions{})
+}
+
+// UploadArticleImageWithGroupOptions 处理文章图片的上传，并可跳过响应 URL 上的图片样式后缀。
+func (s *serviceImpl) UploadArticleImageWithGroupOptions(ctx context.Context, ownerID, userGroupID uint, fileReader io.Reader, originalFilename string, options UploadArticleImageOptions) (string, string, error) {
 	ext := path.Ext(originalFilename)
 	uniqueFilename := strconv.FormatInt(time.Now().UnixNano(), 10) + ext
 
@@ -309,29 +319,33 @@ func (s *serviceImpl) UploadArticleImageWithGroup(ctx context.Context, ownerID, 
 	// 5. 获取文章图片存储策略的样式分隔符配置
 	finalURL := linkResult.URL
 
-	// 查询标记为 article_image 的存储策略
-	policy, err := s.fileSvc.GetPolicyByFlag(ctx, constant.PolicyFlagArticleImage)
-	if err != nil {
-		log.Printf("[文章图片上传] 获取文章图片存储策略失败: %v，使用原始URL", err)
-	} else if policy != nil {
-		// 优先：若启用了 image_process.default_style，返回完整 "sep+style"（如 "!thumbnail"）
-		appendedByStyleSvc := false
-		if s.styleSvc != nil {
-			if suffix := s.styleSvc.ResolveUploadURLSuffix(policy, originalFilename); suffix != "" {
-				finalURL = finalURL + suffix
-				log.Printf("[文章图片上传] 自动拼默认样式: suffix=%s", suffix)
-				appendedByStyleSvc = true
+	if !options.SkipImageStyle {
+		// 查询标记为 article_image 的存储策略
+		policy, err := s.fileSvc.GetPolicyByFlag(ctx, constant.PolicyFlagArticleImage)
+		if err != nil {
+			log.Printf("[文章图片上传] 获取文章图片存储策略失败: %v，使用原始URL", err)
+		} else if policy != nil {
+			// 优先：若启用了 image_process.default_style，返回完整 "sep+style"（如 "!thumbnail"）
+			appendedByStyleSvc := false
+			if s.styleSvc != nil {
+				if suffix := s.styleSvc.ResolveUploadURLSuffix(policy, originalFilename); suffix != "" {
+					finalURL = finalURL + suffix
+					log.Printf("[文章图片上传] 自动拼默认样式: suffix=%s", suffix)
+					appendedByStyleSvc = true
+				}
 			}
-		}
-		// 兜底：老的云端分隔符行为（仅加 "!"），仅在新后缀未命中时执行
-		if !appendedByStyleSvc && policy.Settings != nil {
-			if styleSeparator, ok := policy.Settings[constant.StyleSeparatorSettingKey].(string); ok && styleSeparator != "" {
-				if policy.Type == constant.PolicyTypeTencentCOS || policy.Type == constant.PolicyTypeAliOSS || policy.Type == constant.PolicyTypeQiniu {
-					finalURL = finalURL + styleSeparator
-					log.Printf("[文章图片上传] 已拼接样式分隔符: %s，最终URL: %s", styleSeparator, finalURL)
+			// 兜底：老的云端分隔符行为（仅加 "!"），仅在新后缀未命中时执行
+			if !appendedByStyleSvc && policy.Settings != nil {
+				if styleSeparator, ok := policy.Settings[constant.StyleSeparatorSettingKey].(string); ok && styleSeparator != "" {
+					if policy.Type == constant.PolicyTypeTencentCOS || policy.Type == constant.PolicyTypeAliOSS || policy.Type == constant.PolicyTypeQiniu {
+						finalURL = finalURL + styleSeparator
+						log.Printf("[文章图片上传] 已拼接样式分隔符: %s，最终URL: %s", styleSeparator, finalURL)
+					}
 				}
 			}
 		}
+	} else {
+		log.Printf("[文章图片上传] 已按请求跳过图片样式后缀")
 	}
 
 	log.Printf("[文章图片上传] 成功获取最终直链URL: %s", finalURL)

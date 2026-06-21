@@ -137,6 +137,7 @@ type App struct {
 	tokenSvc              auth.TokenService
 	userSvc               user.UserService
 	fileRepo              repository.FileRepository
+	pageRepo              repository.PageRepository
 	entityRepo            repository.EntityRepository
 	cacheSvc              utility.CacheService
 	eventBus              *event.EventBus
@@ -764,6 +765,7 @@ func NewAppWithOptions(content embed.FS, opts AppOptions) (*App, func(), error) 
 		tokenSvc:              tokenSvc,
 		userSvc:               userSvc,
 		fileRepo:              fileRepo,
+		pageRepo:              pageRepo,
 		entityRepo:            entityRepo,
 		cacheSvc:              cacheSvc,
 		eventBus:              eventBus,
@@ -822,6 +824,10 @@ func (a *App) Engine() *gin.Engine {
 
 func (a *App) FileRepository() repository.FileRepository {
 	return a.fileRepo
+}
+
+func (a *App) PageRepository() repository.PageRepository {
+	return a.pageRepo
 }
 
 func (a *App) EntityRepository() repository.EntityRepository {
